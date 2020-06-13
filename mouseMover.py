@@ -45,9 +45,12 @@ def get(arg,default=0):
 	except Exception as e:
 		print(e)
 
-tLimit = int(get('-l',5))
-print(tLimit)
+tLimit = int(get('-t',-1))
+
+print(' ')
+print("Running for %d" % tLimit)
 Hz=float(get('-h',100))
+print("... at %s Hz" % Hz)
 T=float(1.0/float(Hz));
 
 #tLimit = 2
@@ -60,10 +63,15 @@ logStart=[]
 logStop=[]
 
 try:
-	sessionID=check("cat .\\lastSessionID")
-	if not sessionID:
-		sessionID="%d" % numpy.random.randint(0,100)
-	print(sessionID)
+	lastSessionIDFile=open("lastSessionID",'r')
+	lastSessionID=lastSessionIDFile.read().rstrip('\n')
+	if not lastSessionID:
+		lastSessionID="%d" % numpy.random.randint(0,100)
+	print("Session ID: %s" % lastSessionID)
+	lastSessionIDFile.close()
+	lastSessionIDFile=open("lastSessionID",'w')
+	lastSessionIDFile.write("%s" % (int(lastSessionID)+1))
+	lastSessionIDFile.close()
 except Exception as e:
 	print(e)
 
@@ -98,7 +106,7 @@ def stoplog():
 
 def log():
 	global set, pos, logStart, logStop, logging, logFile, T, tLimit, sessionID
-	global leftClickState
+	global leftClickState, lastSessionID
 	rate=0
 	i=1
 	dtPrev=0
@@ -109,7 +117,7 @@ def log():
 	samples=1000
 	try:
 		#tempLog=check('mktemp')
-		logFile.write("%s" % time.time())
+		logFile.write("%s\n" % time.time())
 		while(logging):
 	# GET CURSOR & WRITE POSITION
 			pos = win32api.GetCursorPos()
@@ -118,12 +126,13 @@ def log():
 			dtPrev=dt
 			dt = time.clock() - logStart
 			dtList.append(dt)
-			if dt > tLimit:
+			if tLimit != -1 and dt > tLimit:
 				logging = False
 			leftClickStatePrev = leftClickState
 			leftClickCheck=win32api.GetKeyState(0x01)
 #			print(leftClickCheck)
 			logFile.write("%s,%s,%s" % (dt,pos[0],pos[1]))
+			logFile.flush()
 			if leftClickState != leftClickCheck:
 				leftClickState = leftClickCheck
 				if leftClickCheck < 0:
@@ -154,6 +163,7 @@ def log():
 #	logFile.flush()
 	logFile.close()
 	print("Closed log: %s" % (logFile.name))
+
 #	logFile=open("%s" % tempLog,"r")
 #	print(logFile.read())
 
@@ -164,7 +174,7 @@ def val():
 	while(value < 2):
 		time.sleep(1)
 
-tempLog="%s\\%s" % (logDir,sessionID)
+tempLog="%s\\%s.csv" % (logDir,lastSessionID)
 print("Logging to %s" % tempLog)
 logFile=open("%s" % tempLog,"a")
 
@@ -172,7 +182,7 @@ logging=True
 logStart = time.clock()
 
 tLog = StoppableThread(target=log,args=())
-
+#tLog.daemon = True
 try:
 	tLog.start()
 except Exception as e:
